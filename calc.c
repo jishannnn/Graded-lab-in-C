@@ -201,6 +201,130 @@ static void set_error(Parser *p, long pos, const char *msg){
   (void)msg;
   if(!p->has_error) {p->has_error = 1; p->err_pos = pos; }
 }
-typedef struct {int is_float; long long ival; double dval; } value;
+typedef struct {int is_float; long long ival; double dval; } Value;
 
-static Value 
+static Value mk_int(long long v) { Value r; r.is_float = 0; r.ival = v; r.dval = 0; return r; }
+static Value mk_flt(double v) { Value r; r.is_float = 1; r.ival = 0; r.dval = v; return r; }
+static double as_double(Value v) { return v.is_float ? v.dval : (double)v.ival;}
+
+static Value parse_expr(Parser* p);
+
+static Value parse_primary(Parser* p) {
+  if (p->has_error) return mk_int(0);
+  Token t = p->cur;
+  if (t.type == T_NUM_INT) { next_token(p); return mk_int(t.ival);}
+  if (t.type == T_NUM_FLOAT) { next_token(p); return mk_flt(t.dval); }
+  if (t.type == T_LPAREN) {
+    next_token(p);
+    Value v = parse_expr(p);
+    if (p->has_error) return v;
+    if (p->cur.type != T_RPAREN) { set_error(p, p->cur.pos, "missing )"); return v;
+    } 
+    return v;     
+  }
+
+  if (t.type == T_END) { set_error(p, t.pos, "missing operand"); return mk_int(0); }
+  if (t.type == T_ERROR) { set_error(p, t.pos, "invalid character"); return mk_int(0); }
+
+set_error(p, t.pos, "unexpected operator");
+return mk_int(0);
+}
+static Value parse_power(Parser* p) {
+  Value base = parse_primary(p);
+  if (p->has_error) return base;
+  if (p->cur.type == T_POW) {
+    long op_pos = p->cur.pos;
+    next_token(p);
+    long exp_pos = p->cur.pos;
+    Value exp = parse_power(p);
+    if (p->has_error) return base;
+
+    if(!base.is_float && !exp.is_float) {
+      if (exp.ival < 0) { set_error(p, exp_pos, "negative exponent "); return base; }
+      long long r = 1, b = base.ival, e = exp.ival;
+      while (e > 0) { if (e & 1) r *= b; b *= b; e >>=1; }
+      return mk_int(r);
+ 
+    } else {
+      double r = pow(as_double(base), as_double(exp));
+      if (!isfinite(r)) {set_error(p, op_pos, "float result not finite"); return base; }
+      return mk_flt(r);
+    }
+  }
+  return base;
+
+}
+static Value parse_term(Parser* p) {
+  Value v = parse_power(p);
+  while (!p->has_error && (p->cur.type == T_STAR || p->cur.type == T_SLASH)){
+    TokType op = p->cur.type;
+    next_token(p);
+    long rhs_pos = p->cur.pos;
+    Value rhs = parse_power(p);
+    if (p->has_error) return v;
+    if (op == T_STAR) {
+      if (!v.is_float && !rhs.is_float) v = mk_int(v.ival * rhs.ival);
+      else {
+        double r = as_double(v) * as_double(rhs);
+        if (!isfinite(r)) { set_error(p, rhs_pos, "overflow"); return v; }
+        v = mk_flt(r);
+      }
+    } else {
+      if (!v.is_float && !rhs.is_float) {
+        if (rhs.ival == 0 ) { set_error(p, rhs_pos, "division by zero"); return v; }
+        v = mk_int(v.ival / rhs.ival);
+      }
+      else {
+        if (as_double(rhs) == 0.0) { set_error(p, rhs_pos, "division by zero"); return v; }
+        v = mk_flt(as_double(v) / as_double(rhs));
+      }
+    }
+  }
+  return v;
+}
+static Value parse_expr(Parser* p) {
+  Value v = parse_term(p);
+  while (!p->has_error && (p->cur.type == T_PLUS || p->cur.type == T_MINUS)) {
+    TokType op = p->cur.type;
+    next_token(p);
+    Value rhs = parse_term(p);
+    if (p->has_error) return v;
+    if (op == T_PLUS) {
+      if (!v.is_float && !rhs.is_float) v = mk_int(v.ival + rhs.ival) ;
+      else v = mk_flt(as_double(v) + as_double(rhs));   
+    } else {
+      if (!v.is_float && !rhs.is_float) v = mk_int(v.ival - rhs.ival);
+      else v = mk_flt(as_double(v) - as_double(rhs));
+    }
+  }
+  return v;
+}
+static int process_file(const char* inpath, const char *outpath) {
+  Buf b = read_file(inpath);
+  FILE *out = fopen(outpath, "wb");
+  if (!out) { fprintf(stderr, "error: cannot open output file\n"); free(b.data); return 1; }
+
+  size_t i =0; 
+  while (i < b.len) {
+    size_t j = i;
+    while (j < b.len && b.data[j] != '\n') j++;
+
+    size_t k = i;
+    while (k < j && (b.data[k] == ' ' || b.data[k] == '\t' || b.data[k] == '\r')) k++;
+    
+    if (k != j && b.data[k] != '#') {
+      Parser p = {0};
+      p.buf = b.data;
+
+      p.len = (j < b.len) ? j + 1 : j;
+      p.idx = i;
+
+      next_token(&p);
+      Value v = parse_expr(&p);
+
+      if (!p.has_error && p.cur.type != T_END) {
+        
+      }
+    }
+  }
+}
