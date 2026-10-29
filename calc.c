@@ -1,5 +1,5 @@
 // Jishan Kaliparamban didesh [251ADB016]
-// https://github.com/<your-username>/calc-lab-home
+// https://github.com/<jishan.kaliparamban-didesh>/calc-lab-home
 // Compile with: gcc -O2 -Wall -Wextra -std=c17 -o calc calc.c -lm
 // Resources used: ChatGPT (conversation history is provided in README.md),
 // standard C library documentation.
@@ -398,9 +398,13 @@ static void base_name(const char *path, char *out, size_t n){
   memcpy(out, s, len);
   out[len] = '\0';
 }
- static void out_name(const char *stem, char *out, size_t n){
-  snprintf(out, n, "%s_jishan_kaliparamban_didesh_251ADB016.txt", stem);
- }
+ 
+
+static void out_name(const char *stem, char *out, size_t n){
+    snprintf(out, n, "%s_jishan_didesh_251ADB016.txt", stem);
+}
+
+
  int main(int argc, char **argv){
   const char *dir = NULL, *outdir = NULL, *infile = NULL;
   int have_file = 0;
@@ -428,7 +432,7 @@ static void base_name(const char *path, char *out, size_t n){
             snprintf(final_outdir, sizeof final_outdir, "%s", outdir);
         } else {
             char base[1024]; base_name(dir, base, sizeof base);
-            snprintf(final_outdir, sizeof final_outdir, "%s_jishan_kaliparamban_didesh_251ADB016", base);
+            snprintf(final_outdir, sizeof final_outdir, "%s_jishan_251ADB016", base);
         }
         if (mkdir_p(final_outdir) != 0) die("error: cannot create output dir");
         struct dirent *de;
@@ -436,8 +440,15 @@ static void base_name(const char *path, char *out, size_t n){
         while ((de = readdir(d))) {
             if (de->d_name[0] == '.') continue;
             size_t nl = strlen(de->d_name);
-            if (nl < 4 || strcmp(de->d_name + nl - 4, ".txt") != 0) continue;
+            if (nl < 4 || strcmp(de->d_name + nl - 4, ".txt") != 0)
+             continue;
+
+            if (nl >= 11 &&
+            strcmp(de->d_name + nl - 11, "_output.txt") == 0)
+             continue;
+
             char inpath[8192];
+
             snprintf(inpath, sizeof inpath, "%s/%s", dir, de->d_name);
             struct stat st;
             if (stat(inpath, &st) != 0 || !S_ISREG(st.st_mode)) continue;
@@ -459,7 +470,7 @@ static void base_name(const char *path, char *out, size_t n){
         if (mkdir_p(outdir) != 0) die("error: cannot create output dir");
         snprintf(opath, sizeof opath, "%s/%s", outdir, oname);
     } else {
-        char d[2048]; snprintf(d, sizeof d, "%s_jishan_kaliparamban_didesh_251ADB016", base);
+        char d[2048]; snprintf(d, sizeof d, "%s_jishan_251ADB016", base);
         if (mkdir_p(d) != 0) die("error: cannot create output dir");
         snprintf(opath, sizeof opath, "%s/%s", d, oname);
     }
